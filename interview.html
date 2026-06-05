@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI面试中 - 应届生AI面试备考助手</title>
+    <style>
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        body { 
+            max-width: 920px; 
+            margin: 0 auto; 
+            padding: 32px 20px; 
+            line-height: 1.65; 
+            transition: background 0.4s ease;
+            min-height: 100vh;
+        }
+        /* 三种页面背景渐变，对应三种面试模式 */
+        body.mode0 { 
+            background: linear-gradient(145deg, #f0fdf4 0%, #ffffff 100%); 
+        }
+        body.mode1 { 
+            background: linear-gradient(145deg, #f0f7ff 0%, #f8fafc 100%); 
+        }
+        body.mode2 { 
+            background: linear-gradient(145deg, #fff5f5 0%, #fff1f1 100%); 
+        }
+
+        /* 顶部导航栏卡片 */
+        .header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 28px;
+            background: #fff;
+            padding: 16px 22px;
+            border-radius: 14px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.06);
+        }
+        h1 { 
+            font-size: 25px; 
+            color: #1e293b;
+            font-weight: 700;
+        }
+        .back-btn { 
+            padding: 9px 18px; 
+            border: 1px solid #e2e8f0; 
+            border-radius: 10px; 
+            background: #f8fafc; 
+            text-decoration: none; 
+            color: #475569;
+            transition: all 0.25s;
+            font-weight: 500;
+        }
+        .back-btn:hover {
+            background: #e2e8f0;
+        }
+
+        /* 模式提示标签美化 */
+        .mode-indicator { 
+            border-radius: 12px; 
+            padding: 14px; 
+            margin-bottom: 22px; 
+            text-align: center; 
+            font-weight: 550;
+            font-size: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .mode0-tag { 
+            background: linear-gradient(135deg, #dcfce7, #f0fdf4); 
+            border: 1px solid #22c55e; 
+            color: #15803d; 
+        }
+        .mode1-tag { 
+            background: linear-gradient(135deg, #dbeafe, #eff6ff); 
+            border: 1px solid #3b82f6; 
+            color: #1e40af; 
+        }
+        .mode2-tag { 
+            background: linear-gradient(135deg, #fee2e2, #fef2f2); 
+            border: 1px solid #ef4444; 
+            color: #b91c1c; 
+        }
+
+        /* 倒计时模块：文字+进度条双样式 */
+        .timer-bar { 
+            display: none; 
+            border-radius: 12px; 
+            padding: 14px 18px; 
+            margin-bottom: 22px; 
+            text-align: center; 
+            font-weight: 600; 
+            font-size: 18px;
+            box-shadow: 0 2px 10px rgba(239,68,68,0.12);
+            position: relative;
+            overflow: hidden;
+        }
+        .timer-bar.show { display: block; }
+        .timer-bar.warning { 
+            background: linear-gradient(135deg,#fffbeb,#fff9e6); 
+            border-color: #fcd34d; 
+            color: #d97706; 
+        }
+        .timer-bar.danger { 
+            background: linear-gradient(135deg,#fef2f2,#fee2e2); 
+            border-color: #fecaca; 
+            color: #dc2626; 
+            animation: pulse 1s infinite; 
+        }
+        @keyframes pulse { 
+            0%,100% { opacity: 1; } 
+            50% { opacity: 0.7; } 
+        }
+
+        /* 聊天框主体 */
+        .chat-container { 
+            border: none; 
+            border-radius: 16px; 
+            padding: 24px; 
+            min-height: 420px; 
+            max-height: 520px; 
+            overflow-y: auto; 
+            background: #ffffff; 
+            margin-bottom: 22px; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 18px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+        }
+        /* 自定义滚动条 */
+        .chat-container::-webkit-scrollbar {
+            width: 6px;
+        }
+        .chat-container::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 99px;
+        }
+        .chat-container::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 99px;
+        }
+
+        /* 聊天气泡美化 */
+        .msg { 
+            max-width: 82%; 
+            padding: 13px 18px; 
+            border-radius: 16px; 
+            font-size: 15px; 
+            word-wrap: break-word;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+        .ai { 
+            background: linear-gradient(135deg,#eff6ff,#f8fbff); 
+            color: #1e40af; 
+            align-self: flex-start; 
+            border-bottom-left-radius: 5px; 
+        }
+        .user { 
+            background: linear-gradient(135deg,#f1f5f9,#eef5fc); 
+            color: #1e293b; 
+            align-self: flex-end; 
+            border-bottom-right-radius: 5px; 
+        }
+
+        /* 底部输入区卡片 */
+        .send-box { 
+            display: flex; 
+            gap: 14px; 
+            align-items: flex-end;
+            background: #fff;
+            padding:20px;
+            border-radius:16px;
+            box-shadow:0 4px 16px rgba(0,0,0,0.06);
+        }
+        .send-box textarea { 
+            flex: 1; 
+            min-height: 72px; 
+            padding: 14px 16px; 
+            border: 1px solid #e2e8f0; 
+            border-radius: 12px; 
+            resize: vertical;
+            transition:0.25s;
+            font-size:15px;
+        }
+        .send-box textarea:focus {
+            outline:none;
+            border-color:#3b82f6;
+            box-shadow:0 0 0 3px rgba(59,130,246,0.12);
+        }
+
+        .btn-group { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 9px; 
+        }
+        .oper-btn { 
+            padding: 9px 16px; 
+            border: none; 
+            border-radius: 10px; 
+            cursor: pointer; 
+            font-size: 14px;
+            transition: all 0.2s;
+            font-weight:500;
+        }
+        .oper-btn:hover {
+            transform: translateY(-2px);
+        }
+        #voiceBtn, #interruptBtn { 
+            font-size: 18px; 
+            padding: 9px 14px; 
+        }
+        #voiceBtn.recording { 
+            background-color: #ef4444; 
+            color: white; 
+            animation: pulse 1s infinite; 
+        }
+        #sendBtn { 
+            padding: 13px 26px; 
+            background: linear-gradient(135deg,#3b82f6,#2563eb); 
+            color: white; 
+            cursor: pointer; 
+            border: none; 
+            border-radius: 10px;
+            font-weight:600;
+            box-shadow:0 3px 10px rgba(59,130,246,0.22);
+            transition:0.25s;
+        }
+        #sendBtn:hover { 
+            background: linear-gradient(135deg,#2563eb,#1d4ed8);
+            transform: translateY(-2px);
+            box-shadow:0 5px 14px rgba(59,130,246,0.3);
+        }
+        .clear-btn { 
+            background: #e5e7eb; 
+            color: #4b5563; 
+        }
+        button:disabled { 
+            opacity: 0.55; 
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow:none !important;
+        }
+
+        /* 弹窗美化 */
+        #reportModal { 
+            display: none; 
+            position: fixed; 
+            top:0; 
+            left:0; 
+            width:100%; 
+            height:100%; 
+            background:rgba(0,0,0,0.55); 
+            z-index:100; 
+            justify-content:center; 
+            align-items:center;
+            padding:20px;
+        }
+        .report-box { 
+            background: white; 
+            width:90%; 
+            max-width:720px; 
+            max-height:82%; 
+            overflow:auto; 
+            padding:32px; 
+            border-radius:18px;
+            box-shadow:0 8px 32px rgba(0,0,0,0.18);
+        }
+        .report-box h2 {
+            margin-bottom:18px;
+            color:#1e293b;
+        }
+        .report-content {
+            line-height:1.7;
+            color:#334155;
+        }
+        .close-btn { 
+            margin-top:24px; 
+            padding:11px 32px; 
+            background:linear-gradient(135deg,#3b82f6,#2563eb); 
+            color:white; 
+            border:none; 
+            border-radius:10px; 
+            cursor:pointer;
+            transition:0.25s;
+            font-weight:500;
+        }
+        .close-btn:hover {
+            transform: translateY(-2px);
+            box-shadow:0 4px 12px rgba(59,130,246,0.25);
+        }
+
+        /* 移动端适配 */
+        @media (max-width:550px){
+            .send-box {
+                flex-direction:column;
+            }
+            .btn-group {
+                flex-direction:row;
+                flex-wrap:wrap;
+                width:100%;
+            }
+            h1 {font-size:22px;}
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎯 AI面试进行中</h1>
+        <a href="/" class="back-btn">← 返回首页</a>
+    </div>
+    <div class="mode-indicator" id="modeIndicator"></div>
+    <div class="timer-bar" id="timerBar">剩余答题时间：<span id="countdown">60</span> 秒</div>
+    <div class="chat-container" id="chatBox"><div class="msg ai">正在加载面试信息...</div></div>
+    <div class="send-box">
+        <textarea id="userAnswer" placeholder="在这里输入你的回答..."></textarea>
+        <div class="btn-group">
+            <button class="oper-btn" id="voiceBtn" title="开始/停止录音">🎙️</button>
+            <button class="oper-btn" id="interruptBtn" title="打断/停止朗读" style="display:none; background:#f97316;color:#fff;">⏹️</button>
+            <button class="oper-btn clear-btn" onclick="clearAnswer()">清空</button>
+            <button class="oper-btn" onclick="endInterview()" style="background:#ef4444;color:white;">结束面试</button>
+            <button id="sendBtn" onclick="sendMsg()">发送</button>
+        </div>
+    </div>
+    <div id="reportModal"><div class="report-box"><h2>📋 面试评估报告</h2><div class="report-content" id="reportContent"></div><button class="close-btn" onclick="closeReport()">关闭</button></div></div>
+
+    <script>
+        let currentMode = 0;
+        let timerInterval = null;
+        let remainingSeconds = 60;
+        let interviewStarted = false;
+        let targetJob = '';
+        let userId = "user-" + Date.now();
+        let conversationId = "";
+        let recognition = null;
+        let isRecording = false;
+        let accumulatedTranscript = "";
+        let isSpeaking = false;          // AI是否正在朗读
+        let pendingResumeTimer = false;  // 朗读结束后需要恢复倒计时
+
+        window.onload = function() {
+            currentMode = parseInt(localStorage.getItem('interviewMode') || '0');
+            targetJob = localStorage.getItem('targetJob') || '岗位';
+            const resume = localStorage.getItem('resumeContent') || '';
+            const body = document.body;
+            const indicator = document.getElementById('modeIndicator');
+            if(currentMode === 0){
+                body.className = 'mode0';
+                indicator.className = 'mode-indicator mode0-tag';
+                indicator.innerText = '当前模式：📝 练习模式（自由作答，无时间限制）';
+            }else if(currentMode === 1){
+                body.className = 'mode1';
+                indicator.className = 'mode-indicator mode1-tag';
+                indicator.innerText = '当前模式：💬 标准面试（正式流程，正常作答）';
+                document.getElementById('timerBar').classList.remove('show');
+            }else{
+                body.className = 'mode2';
+                indicator.className = 'mode-indicator mode2-tag';
+                indicator.innerText = '当前模式：⚡ 压力面试（限时60秒，请尽快作答）';
+                document.getElementById('timerBar').classList.add('show');
+                document.getElementById('interruptBtn').style.display = 'inline-block';
+            }
+            if(currentMode !== 0) document.querySelector('.clear-btn').style.display = 'none';
+            startInterview(targetJob, resume);
+        };
+
+        // ========== 倒计时控制 ==========
+        function stopTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = null;
+        }
+        function startTimerFrom(seconds) {
+            if (currentMode !== 2) return;
+            if (timerInterval) stopTimer();
+            remainingSeconds = seconds;
+            document.getElementById('countdown').innerText = remainingSeconds;
+            if (remainingSeconds <= 0) {
+                handleTimeout();
+                return;
+            }
+            timerInterval = setInterval(() => {
+                if (isSpeaking) return; // AI说话期间不计时，但不停止定时器，只是不减少
+                if (remainingSeconds <= 1) {
+                    stopTimer();
+                    handleTimeout();
+                } else {
+                    remainingSeconds--;
+                    document.getElementById('countdown').innerText = remainingSeconds;
+                    const bar = document.getElementById('timerBar');
+                    if (remainingSeconds <= 10) bar.classList.add('danger');
+                    else if (remainingSeconds <= 20) bar.classList.add('warning');
+                }
+            }, 1000);
+        }
+        function resetAndStartTimer() {
+            if (currentMode !== 2) return;
+            stopTimer();
+            remainingSeconds = 60;
+            document.getElementById('countdown').innerText = remainingSeconds;
+            const bar = document.getElementById('timerBar');
+            bar.classList.remove('warning', 'danger');
+            // 如果AI正在说话，先不启动，标记待恢复
+            if (isSpeaking) {
+                pendingResumeTimer = true;
+            } else {
+                startTimerFrom(remainingSeconds);
+            }
+        }
+        function resumeTimerAfterSpeaking() {
+            if (currentMode !== 2) return;
+            if (pendingResumeTimer) {
+                pendingResumeTimer = false;
+                startTimerFrom(remainingSeconds);
+            }
+        }
+        function handleTimeout() {
+            if (!interviewStarted) return;
+            stopTimer();
+            if (isRecording && recognition) recognition.stop();
+            const input = document.getElementById('userAnswer');
+            if (input.value.trim()) {
+                sendMsg();
+            } else {
+                sendRawMessage('【超时】');
+            }
+        }
+
+        // ========== 语音识别 ==========
+        function initSpeechRecognition() {
+            if (recognition) return;
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) { alert("浏览器不支持语音识别，请使用Chrome/Edge"); return; }
+            recognition = new SpeechRecognition();
+            recognition.lang = 'zh-CN';
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.onstart = () => {
+                isRecording = true;
+                accumulatedTranscript = "";
+                document.getElementById('voiceBtn').classList.add('recording');
+                document.getElementById('voiceBtn').innerText = '🔴 录音中...';
+            };
+            recognition.onend = () => {
+                isRecording = false;
+                document.getElementById('voiceBtn').classList.remove('recording');
+                document.getElementById('voiceBtn').innerText = '🎙️';
+                if (accumulatedTranscript.trim()) {
+                    const input = document.getElementById('userAnswer');
+                    input.value = accumulatedTranscript.trim();
+                    sendMsg();
+                }
+                accumulatedTranscript = "";
+            };
+            recognition.onerror = (e) => { console.error(e.error); if(isRecording) recognition.stop(); };
+            recognition.onresult = (e) => {
+                let final = "";
+                for (let i = e.resultIndex; i < e.results.length; i++) {
+                    if (e.results[i].isFinal) final += e.results[i][0].transcript;
+                }
+                if (final) accumulatedTranscript += final;
+                const input = document.getElementById('userAnswer');
+                if (accumulatedTranscript) input.value = accumulatedTranscript;
+            };
+        }
+        document.getElementById('voiceBtn').addEventListener('click', () => {
+            if (isSpeaking) { alert("AI正在说话，请稍后再试"); return; }
+            if (!recognition) { initSpeechRecognition(); setTimeout(() => recognition && !isRecording && recognition.start(), 100); return; }
+            if (isRecording) recognition.stop();
+            else recognition.start();
+        });
+
+        // ========== 语音合成 ==========
+        function speakText(text) {
+            if (currentMode === 0) return;
+            if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
+            if (currentMode === 2) {
+                isSpeaking = true;
+                pendingResumeTimer = false;
+                stopTimer();  // 朗读期间暂停倒计时
+                enableUserInput(false);
+            }
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'zh-CN';
+            utterance.rate = 1.0;
+            utterance.onend = () => {
+                if (currentMode === 2) {
+                    isSpeaking = false;
+                    enableUserInput(true);
+                    resumeTimerAfterSpeaking();
+                }
+            };
+            utterance.onerror = () => {
+                if (currentMode === 2) {
+                    isSpeaking = false;
+                    enableUserInput(true);
+                    resumeTimerAfterSpeaking();
+                }
+            };
+            window.speechSynthesis.speak(utterance);
+        }
+        function enableUserInput(enable) {
+            document.getElementById('userAnswer').disabled = !enable;
+            document.getElementById('voiceBtn').disabled = !enable;
+            document.getElementById('sendBtn').disabled = !enable;
+        }
+
+        // 打断按钮
+        document.getElementById('interruptBtn').addEventListener('click', () => {
+            if (window.speechSynthesis.speaking) {
+                window.speechSynthesis.cancel();
+                if (currentMode === 2) {
+                    isSpeaking = false;
+                    enableUserInput(true);
+                    resumeTimerAfterSpeaking();
+                }
+            }
+            if (currentMode === 2 && interviewStarted) sendRawMessage('【用户主动打断】');
+        });
+
+        // ========== 业务逻辑 ==========
+        async function startInterview(job, resume) {
+            interviewStarted = true;
+            const chat = document.getElementById('chatBox');
+            chat.innerHTML = '<div class="msg ai">正在连接AI面试官...</div>';
+            const modeNames = ['练习模式', '标准面试', '压力面试'];
+            const mode = modeNames[currentMode];
+            try {
+                const res = await fetch('/api/start', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ job, resume, mode, user: userId })
+                });
+                const data = await res.json();
+                if (!data.answer || data.answer === "无回复") { chat.innerHTML = '<div class="msg ai">AI未返回内容，请检查配置</div>'; return; }
+                conversationId = data.conversation_id || "";
+                chat.innerHTML = '';
+                addAiMsg(data.answer);
+                if (currentMode === 2) resetAndStartTimer();
+            } catch(err) { chat.innerHTML = '<div class="msg ai">连接失败：' + err.message + '</div>'; }
+        }
+
+        async function sendMsg() {
+            const input = document.getElementById('userAnswer');
+            const text = input.value.trim();
+            if (!text) return;
+            if (isRecording && recognition) recognition.stop();
+            stopTimer();
+            addUserMsg(text);
+            input.value = '';
+            const thinking = addAiMsg('思考中...');
+            try {
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ message: text, conversation_id: conversationId, user: userId })
+                });
+                const data = await res.json();
+                thinking.remove();
+                if (!data.answer || data.answer === "无回复") { addAiMsg('AI未返回内容'); return; }
+                conversationId = data.conversation_id || conversationId;
+                addAiMsg(data.answer);
+                if (currentMode === 2) resetAndStartTimer();
+            } catch(err) { thinking.innerText = '出错了：' + err.message; }
+        }
+
+        async function sendRawMessage(message) {
+            const input = document.getElementById('userAnswer');
+            input.value = message;
+            await sendMsg();
+            input.value = '';
+        }
+
+        async function endInterview() {
+            if (!interviewStarted) return;
+            stopTimer();
+            addAiMsg('正在生成面试报告...');
+            try {
+                const res = await fetch('/api/report', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ conversation_id: conversationId, user: userId })
+                });
+                const data = await res.json();
+                if (data.error) alert('错误：' + data.error);
+                else { document.getElementById('reportContent').innerText = data.report || '报告生成失败'; document.getElementById('reportModal').style.display = 'flex'; }
+            } catch(err) { alert('生成报告失败：' + err.message); }
+        }
+
+        function addAiMsg(text) {
+            const chat = document.getElementById('chatBox');
+            const div = document.createElement('div'); div.className = 'msg ai'; div.innerText = text; chat.appendChild(div); chat.scrollTop = chat.scrollHeight;
+            speakText(text);
+            return div;
+        }
+        function addUserMsg(text) {
+            const chat = document.getElementById('chatBox');
+            const div = document.createElement('div'); div.className = 'msg user'; div.innerText = text; chat.appendChild(div); chat.scrollTop = chat.scrollHeight;
+        }
+        function clearAnswer() { document.getElementById('userAnswer').value = ''; }
+        function closeReport() { document.getElementById('reportModal').style.display = 'none'; }
+        document.getElementById('userAnswer').addEventListener('keydown', e => { if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendMsg(); } });
+    </script>
+</body>
+</html>
