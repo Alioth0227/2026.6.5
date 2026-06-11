@@ -338,8 +338,8 @@
         let recognition = null;
         let isRecording = false;
         let accumulatedTranscript = "";
-        let isSpeaking = false;          // AI是否正在朗读
-        let pendingResumeTimer = false;  // 朗读结束后需要恢复倒计时
+        let isSpeaking = false;
+        let pendingResumeTimer = false;
 
         window.onload = function() {
             currentMode = parseInt(localStorage.getItem('interviewMode') || '0');
@@ -364,8 +364,23 @@
                 document.getElementById('interruptBtn').style.display = 'inline-block';
             }
             if(currentMode !== 0) document.querySelector('.clear-btn').style.display = 'none';
+
+            // 提前预初始化语音识别 & 语音合成
+            checkSpeechSupport();
             startInterview(targetJob, resume);
         };
+
+        // 检测语音整体支持性
+        function checkSpeechSupport() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                document.getElementById('voiceBtn').disabled = true;
+                alert("当前浏览器不支持语音识别\n请使用 Chrome / Edge 最新版，并确保网站为 HTTPS 访问");
+            }
+            if (!window.speechSynthesis) {
+                console.log("当前浏览器不支持语音朗读");
+            }
+        }
 
         // ========== 倒计时控制 ==========
         function stopTimer() {
@@ -382,7 +397,7 @@
                 return;
             }
             timerInterval = setInterval(() => {
-                if (isSpeaking) return; // AI说话期间不计时，但不停止定时器，只是不减少
+                if (isSpeaking) return;
                 if (remainingSeconds <= 1) {
                     stopTimer();
                     handleTimeout();
@@ -402,7 +417,6 @@
             document.getElementById('countdown').innerText = remainingSeconds;
             const bar = document.getElementById('timerBar');
             bar.classList.remove('warning', 'danger');
-            // 如果AI正在说话，先不启动，标记待恢复
             if (isSpeaking) {
                 pendingResumeTimer = true;
             } else {
@@ -428,58 +442,90 @@
             }
         }
 
-        // ========== 语音识别 ==========
+        // ========== 语音识别 - 增强版 ==========
         function initSpeechRecognition() {
+            // 防止重复实例化
             if (recognition) return;
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRecognition) { alert("浏览器不支持语音识别，请使用Chrome/Edge"); return; }
-            recognition = new SpeechRecognition();
-            recognition.lang = 'zh-CN';
-            recognition.continuous = true;
-            recognition.interimResults = true;
-            recognition.onstart = () => {
-                isRecording = true;
-                accumulatedTranscript = "";
-                document.getElementById('voiceBtn').classList.add('recording');
-                document.getElementById('voiceBtn').innerText = '🔴 录音中...';
-            };
-            recognition.onend = () => {
-                isRecording = false;
-                document.getElementById('voiceBtn').classList.remove('recording');
-                document.getElementById('voiceBtn').innerText = '🎙️';
-                if (accumulatedTranscript.trim()) {
+            if (!SpeechRecognition) return;
+
+            try {
+                recognition = new SpeechRecognition();
+                recognition.lang = 'zh-CN';
+                recognition.continuous = true;
+                recognition.interimResults = true;
+
+                recognition.onstart = () => {
+                    isRecording = true;
+                    accumulatedTranscript = "";
+                    document.getElementById('voiceBtn').classList.add('recording');
+                    document.getElementById('voiceBtn').innerText = '🔴 录音中...';
+                };
+
+                recognition.onend = () => {
+                    isRecording = false;
+                    document.getElementById('voiceBtn').classList.remove('recording');
+                    document.getElementById('voiceBtn').innerText = '🎙️';
+                    if (accumulatedTranscript.trim()) {
+                        const input = document.getElementById('userAnswer');
+                        input.value = accumulatedTranscript.trim();
+                        sendMsg();
+                    }
+                    accumulatedTranscript = "";
+                };
+
+                recognition.onerror = (e) => {
+                    console.error("语音识别错误：", e.error);
+                    if(e.error === 'not-allowed'){
+                        alert("麦克风权限被禁用！\n请点击地址栏 🔒 图标，手动允许【麦克风】权限");
+                    }
+                    if(isRecording && recognition) recognition.stop();
+                };
+
+                recognition.onresult = (e) => {
+                    let final = "";
+                    for (let i = e.resultIndex; i < e.results.length; i++) {
+                        if (e.results[i].isFinal) final += e.results[i][0].transcript;
+                    }
+                    if (final) accumulatedTranscript += final;
                     const input = document.getElementById('userAnswer');
-                    input.value = accumulatedTranscript.trim();
-                    sendMsg();
-                }
-                accumulatedTranscript = "";
-            };
-            recognition.onerror = (e) => { console.error(e.error); if(isRecording) recognition.stop(); };
-            recognition.onresult = (e) => {
-                let final = "";
-                for (let i = e.resultIndex; i < e.results.length; i++) {
-                    if (e.results[i].isFinal) final += e.results[i][0].transcript;
-                }
-                if (final) accumulatedTranscript += final;
-                const input = document.getElementById('userAnswer');
-                if (accumulatedTranscript) input.value = accumulatedTranscript;
-            };
+                    if (accumulatedTranscript) input.value = accumulatedTranscript;
+                };
+            } catch (err) {
+                console.error("初始化语音识别失败：", err);
+                alert("语音功能初始化失败，请刷新页面重试");
+            }
         }
+
         document.getElementById('voiceBtn').addEventListener('click', () => {
-            if (isSpeaking) { alert("AI正在说话，请稍后再试"); return; }
-            if (!recognition) { initSpeechRecognition(); setTimeout(() => recognition && !isRecording && recognition.start(), 100); return; }
-            if (isRecording) recognition.stop();
-            else recognition.start();
+            if (isSpeaking) {
+                alert("AI正在说话，请稍后再试");
+                return;
+            }
+            if (!recognition) {
+                initSpeechRecognition();
+                setTimeout(() => {
+                    if(recognition && !isRecording) recognition.start();
+                }, 200);
+                return;
+            }
+            if (isRecording) {
+                recognition.stop();
+            } else {
+                recognition.start();
+            }
         });
 
         // ========== 语音合成 ==========
         function speakText(text) {
             if (currentMode === 0) return;
+            if (!window.speechSynthesis) return;
+
             if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
             if (currentMode === 2) {
                 isSpeaking = true;
                 pendingResumeTimer = false;
-                stopTimer();  // 朗读期间暂停倒计时
+                stopTimer();
                 enableUserInput(false);
             }
             const utterance = new SpeechSynthesisUtterance(text);
@@ -501,6 +547,7 @@
             };
             window.speechSynthesis.speak(utterance);
         }
+
         function enableUserInput(enable) {
             document.getElementById('userAnswer').disabled = !enable;
             document.getElementById('voiceBtn').disabled = !enable;
@@ -534,12 +581,17 @@
                     body: JSON.stringify({ job, resume, mode, user: userId })
                 });
                 const data = await res.json();
-                if (!data.answer || data.answer === "无回复") { chat.innerHTML = '<div class="msg ai">AI未返回内容，请检查配置</div>'; return; }
+                if (!data.answer || data.answer === "无回复") {
+                    chat.innerHTML = '<div class="msg ai">AI未返回内容，请检查配置</div>';
+                    return;
+                }
                 conversationId = data.conversation_id || "";
                 chat.innerHTML = '';
                 addAiMsg(data.answer);
                 if (currentMode === 2) resetAndStartTimer();
-            } catch(err) { chat.innerHTML = '<div class="msg ai">连接失败：' + err.message + '</div>'; }
+            } catch(err) {
+                chat.innerHTML = '<div class="msg ai">连接失败：' + err.message + '</div>';
+            }
         }
 
         async function sendMsg() {
@@ -555,15 +607,20 @@
                 const res = await fetch('/api/chat', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ message: text, conversation_id: conversationId, user: userId })
+                    body: JSON.stringify({ message: text, user: userId })
                 });
                 const data = await res.json();
                 thinking.remove();
-                if (!data.answer || data.answer === "无回复") { addAiMsg('AI未返回内容'); return; }
+                if (!data.answer || data.answer === "无回复") {
+                    addAiMsg('AI未返回内容');
+                    return;
+                }
                 conversationId = data.conversation_id || conversationId;
                 addAiMsg(data.answer);
                 if (currentMode === 2) resetAndStartTimer();
-            } catch(err) { thinking.innerText = '出错了：' + err.message; }
+            } catch(err) {
+                thinking.innerText = '出错了：' + err.message;
+            }
         }
 
         async function sendRawMessage(message) {
@@ -581,27 +638,50 @@
                 const res = await fetch('/api/report', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ conversation_id: conversationId, user: userId })
+                    body: JSON.stringify({ user: userId })
                 });
                 const data = await res.json();
-                if (data.error) alert('错误：' + data.error);
-                else { document.getElementById('reportContent').innerText = data.report || '报告生成失败'; document.getElementById('reportModal').style.display = 'flex'; }
-            } catch(err) { alert('生成报告失败：' + err.message); }
+                if (data.error) {
+                    alert('错误：' + data.error);
+                } else {
+                    document.getElementById('reportContent').innerText = data.report || '报告生成失败';
+                    document.getElementById('reportModal').style.display = 'flex';
+                }
+            } catch(err) {
+                alert('生成报告失败：' + err.message);
+            }
         }
 
         function addAiMsg(text) {
             const chat = document.getElementById('chatBox');
-            const div = document.createElement('div'); div.className = 'msg ai'; div.innerText = text; chat.appendChild(div); chat.scrollTop = chat.scrollHeight;
+            const div = document.createElement('div');
+            div.className = 'msg ai';
+            div.innerText = text;
+            chat.appendChild(div);
+            chat.scrollTop = chat.scrollHeight;
             speakText(text);
             return div;
         }
         function addUserMsg(text) {
             const chat = document.getElementById('chatBox');
-            const div = document.createElement('div'); div.className = 'msg user'; div.innerText = text; chat.appendChild(div); chat.scrollTop = chat.scrollHeight;
+            const div = document.createElement('div');
+            div.className = 'msg user';
+            div.innerText = text;
+            chat.appendChild(div);
+            chat.scrollTop = chat.scrollHeight;
         }
-        function clearAnswer() { document.getElementById('userAnswer').value = ''; }
-        function closeReport() { document.getElementById('reportModal').style.display = 'none'; }
-        document.getElementById('userAnswer').addEventListener('keydown', e => { if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendMsg(); } });
+        function clearAnswer() {
+            document.getElementById('userAnswer').value = '';
+        }
+        function closeReport() {
+            document.getElementById('reportModal').style.display = 'none';
+        }
+        document.getElementById('userAnswer').addEventListener('keydown', e => {
+            if(e.key === 'Enter' && !e.shiftKey){
+                e.preventDefault();
+                sendMsg();
+            }
+        });
     </script>
 </body>
 </html>
